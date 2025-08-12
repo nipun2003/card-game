@@ -1,5 +1,9 @@
 package com.nipunapps.cardgame.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nipunapps.cardgame.dto.enums.ErrorCode;
+import com.nipunapps.cardgame.dto.enums.LoginErrorCode;
+import com.nipunapps.cardgame.dto.response.BaseResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -7,9 +11,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.security.authentication.*;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.session.InMemoryReactiveSessionRegistry;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.WebFilterExchange;
 import org.springframework.security.web.server.authentication.SessionLimit;
@@ -20,7 +26,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 @Configuration
 @Slf4j
@@ -28,6 +33,8 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final CustomReactiveAuthenticationManager authenticationManager;
+    private final ObjectMapper objectMapper;
+    private final AuthenticationSuccessHandler successHandler;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -49,9 +56,9 @@ public class SecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(login -> login
                         .loginPage("/auth/login")
-                        .authenticationSuccessHandler(handlers -> {
-                            handlers.add(new AuthenticationSuccessHandler());
-                        })
+                        .authenticationSuccessHandler(handlers ->
+                                handlers.add(successHandler)
+                        )
                         .authenticationFailureHandler(this::handleLoginFailure)
                 )
                 .authenticationManager(authenticationManager)
@@ -64,13 +71,42 @@ public class SecurityConfig {
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().add("Content-Type", "application/json");
 
-        String jsonResponse = String.format(
-                "{\"status\":\"error\",\"message\":\"%s\"}",
-                exception.getMessage()
-        );
+        ErrorCode errorCode = getAuthErrorCode(exception);
 
-        DataBuffer buffer = response.bufferFactory().wrap(jsonResponse.getBytes());
+        response.setStatusCode(HttpStatus.valueOf(errorCode.getHttpStatus()));
+
+        final var responseData = new BaseResponse<>(errorCode);
+        String jsonErrorResponse;
+        try {
+            jsonErrorResponse = objectMapper.writeValueAsString(responseData);
+
+        } catch (Exception e) {
+            jsonErrorResponse = "{\"success\": false, \"message\": \"An error occurred while processing the error response\", \"errorCode\": \"INTERNAL_ERROR\"}";
+        }
+
+        DataBuffer buffer = response.bufferFactory().wrap(jsonErrorResponse.getBytes());
         return response.writeWith(Mono.just(buffer));
+    }
+
+    private static ErrorCode getAuthErrorCode(AuthenticationException exception) {
+        ErrorCode errorCode;
+
+        if (exception instanceof LockedException) {
+            errorCode = LoginErrorCode.ACCOUNT_LOCKED;
+        } else if (exception instanceof DisabledException) {
+            errorCode = LoginErrorCode.ACCOUNT_DISABLED;
+        } else if (exception instanceof BadCredentialsException) {
+            errorCode = LoginErrorCode.INVALID_CREDENTIALS;
+        } else if (exception instanceof UsernameNotFoundException) {
+            errorCode = LoginErrorCode.USER_NOT_FOUND;
+        } else if (exception instanceof CredentialsExpiredException) {
+            errorCode = LoginErrorCode.CREDENTIALS_EXPIRED;
+        } else if (exception instanceof AccountExpiredException) {
+            errorCode = LoginErrorCode.ACCOUNT_EXPIRED;
+        } else {
+            errorCode = LoginErrorCode.AUTH_FAILED;
+        }
+        return errorCode;
     }
 
     private CorsConfigurationSource corsConfigurationSource() {
