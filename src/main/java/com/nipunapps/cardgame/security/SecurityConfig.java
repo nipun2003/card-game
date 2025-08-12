@@ -20,8 +20,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final CustomReactiveAuthenticationManager authenticationManager;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+    private final CustomReactiveUserDetailsService userDetailsService;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -44,7 +44,6 @@ public class SecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable
                 )
-                .authenticationManager(authenticationManager)
                 .build();
 
     }
@@ -76,6 +75,5 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-
 
 }
