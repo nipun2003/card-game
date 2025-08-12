@@ -22,9 +22,11 @@ public class CustomReactiveAuthenticationManager implements ReactiveAuthenticati
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
         String username = authentication.getName();
-        log.info("Authenticating user: {}", username);
         String presentPassword = (String) authentication.getCredentials();
         return userDetailsService.findByUsername(username)
+                .doOnSuccess((d)->{
+                    log.info("Username {} authenticated", d.getAuthorities());
+                })
                 .switchIfEmpty(Mono.error(new UsernameNotFoundException(username)))
                 .flatMap(userDetails -> {
                     if (!passwordEncoder.matches(presentPassword, userDetails.getPassword())) {

@@ -13,7 +13,14 @@ import org.springframework.security.core.session.InMemoryReactiveSessionRegistry
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.WebFilterExchange;
 import org.springframework.security.web.server.authentication.SessionLimit;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 @Configuration
 @Slf4j
@@ -26,6 +33,7 @@ public class SecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchange -> {
                     exchange.pathMatchers("/").permitAll();
                     exchange.pathMatchers("/health").permitAll();
@@ -63,6 +71,34 @@ public class SecurityConfig {
 
         DataBuffer buffer = response.bufferFactory().wrap(jsonResponse.getBytes());
         return response.writeWith(Mono.just(buffer));
+    }
+
+    private CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Allow localhost:5173 (and other origins if needed)
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",
+                "https://localhost:5173" // Include HTTPS if needed
+        ));
+
+        // Allow all HTTP methods
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
+
+        // Allow all headers
+        configuration.setAllowedHeaders(List.of("*"));
+
+        // Allow credentials (important for your session-based auth)
+        configuration.setAllowCredentials(true);
+
+        // Cache preflight response for 1 hour
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
 
