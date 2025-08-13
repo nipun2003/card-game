@@ -1,6 +1,9 @@
 package com.nipunapps.cardgame.dto.enums;
 
+import lombok.Setter;
+
 public enum LoginErrorCode implements ErrorCode {
+    INVALID_REQUEST("INVALID_REQUEST", "Invalid login body format", 400),
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", "Invalid username or password", 401),
     ACCOUNT_LOCKED("ACCOUNT_LOCKED", "Your account has been locked. Please contact support.", 403),
     ACCOUNT_DISABLED("ACCOUNT_DISABLED", "Your account has been disabled. Please contact support.", 403),
@@ -10,7 +13,9 @@ public enum LoginErrorCode implements ErrorCode {
     AUTH_FAILED("AUTH_FAILED", "Authentication failed", 401);
 
     private final String code;
-    private final String message;
+
+    @Setter
+    private String message;
     private final int httpStatus;
 
     LoginErrorCode(String code, String message, int httpStatus) {

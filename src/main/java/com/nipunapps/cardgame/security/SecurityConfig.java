@@ -4,10 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.session.InMemoryReactiveSessionRegistry;
+import org.springframework.security.core.session.ReactiveSessionRegistry;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.SessionLimit;
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -21,10 +24,21 @@ import java.util.List;
 public class SecurityConfig {
 
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
-    private final CustomReactiveUserDetailsService userDetailsService;
+    private final JsonBodyAuthenticationConverter authenticationConverter;
+    private final CustomReactiveAuthenticationManager authenticationManager;
+    private final AuthenticationSuccessHandler authenticationSuccessHandler;
+    private final AuthenticationFailureHandler authenticationFailureHandler;
+    private final ReactiveSessionRegistry sessionRegistry;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        AuthenticationWebFilter loginFilter = new AuthenticationWebFilter(authenticationManager);
+        loginFilter.setServerAuthenticationConverter(authenticationConverter);
+        loginFilter.setRequiresAuthenticationMatcher(
+                ServerWebExchangeMatchers.pathMatchers(HttpMethod.POST, "/auth/login")
+        );
+        loginFilter.setAuthenticationSuccessHandler(authenticationSuccessHandler);
+        loginFilter.setAuthenticationFailureHandler(authenticationFailureHandler);
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -35,15 +49,9 @@ public class SecurityConfig {
                     exchange.pathMatchers("/auth/**").permitAll();
                     exchange.anyExchange().authenticated();
                 })
-                .sessionManagement(session -> session
-                        .concurrentSessions(c -> c
-                                .maximumSessions(SessionLimit.of(3))
-                                .sessionRegistry(new InMemoryReactiveSessionRegistry())
-                        )
-                )
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable
-                )
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .addFilterAt(loginFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
 
     }

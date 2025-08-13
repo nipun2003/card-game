@@ -37,27 +37,27 @@ public class AuthController {
                 );
     }
 
-    @PostMapping("/login")
-    public Mono<ResponseEntity<BaseResponse<LoginResponseDto>>> login(@RequestBody LoginRequestDto request,
-                                                                      ServerWebExchange exchange) {
-        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
-                request.getEmail(),
-                request.getPassword()
-        );
-        return authenticationManager.authenticate(token)
-                .flatMap(authentication -> {
-                    // If authentication is successful, return a 200 OK response
-                    LoginResponseDto responseDto = new LoginResponseDto(
-                            authentication.getName(),
-                            authentication.getAuthorities().stream().map(c -> c.getAuthority()).toList()
-                    );
-                    final var responseData = BaseResponse.<LoginResponseDto>builder()
-                            .success(true)
-                            .data(responseDto)
-                            .build();
-                    return securityContextRepository.save(exchange, new SecurityContextImpl(authentication))
-                            .thenReturn(ResponseEntity.ok()
-                                    .body(responseData));
-                });
-    }
+//    @PostMapping("/login")
+//    public Mono<ResponseEntity<BaseResponse<LoginResponseDto>>> login(@RequestBody LoginRequestDto request,
+//                                                                      ServerWebExchange exchange) {
+//        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
+//                request.getEmail(),
+//                request.getPassword()
+//        );
+//        return authenticationManager.authenticate(token)
+//                .flatMap(authentication -> {
+//                    // If authentication is successful, return a 200 OK response
+//                    LoginResponseDto responseDto = new LoginResponseDto(
+//                            authentication.getName(),
+//                            authentication.getAuthorities().stream().map(c -> c.getAuthority()).toList()
+//                    );
+//                    final var responseData = BaseResponse.<LoginResponseDto>builder()
+//                            .success(true)
+//                            .data(responseDto)
+//                            .build();
+//                    return securityContextRepository.save(exchange, new SecurityContextImpl(authentication))
+//                            .thenReturn(ResponseEntity.ok()
+//                                    .body(responseData));
+//                });
+//    }
 }

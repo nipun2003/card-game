@@ -2,6 +2,8 @@ package com.nipunapps.cardgame.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.core.session.InMemoryReactiveSessionRegistry;
+import org.springframework.security.core.session.ReactiveSessionRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
@@ -18,5 +20,10 @@ public class SecurityModule {
     @Bean
     public ServerSecurityContextRepository securityContextRepository() {
         return new WebSessionServerSecurityContextRepository();
+    }
+
+    @Bean
+    public ReactiveSessionRegistry sessionRegistry() {
+        return new InMemoryReactiveSessionRegistry();
     }
 }

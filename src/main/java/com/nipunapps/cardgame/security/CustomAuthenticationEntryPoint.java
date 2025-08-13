@@ -25,7 +25,11 @@ public class CustomAuthenticationEntryPoint implements ServerAuthenticationEntry
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException ex) {
         ServerHttpResponse response = exchange.getResponse();
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        final var responseData = new BaseResponse<>(CommonErrorCode.UNAUTHORIZED);
+        final var responseData = BaseResponse.builder()
+                .success(false)
+                .message("Unauthorized access - please log in to continue.")
+                .errorCode(CommonErrorCode.UNAUTHORIZED.getCode())
+                .build();
         String responseBody;
         try {
             responseBody = objectMapper.writeValueAsString(responseData);
