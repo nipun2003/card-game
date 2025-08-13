@@ -6,6 +6,7 @@ import com.nipunapps.cardgame.dto.enums.LoginErrorCode;
 import com.nipunapps.cardgame.dto.response.BaseResponse;
 import com.nipunapps.cardgame.exception.BadLoginRequestFormat;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -17,6 +18,7 @@ import org.springframework.security.web.server.authentication.ServerAuthenticati
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AuthenticationFailureHandler implements ServerAuthenticationFailureHandler {
@@ -43,6 +45,7 @@ public class AuthenticationFailureHandler implements ServerAuthenticationFailure
             code.setMessage(e.getMessage());
             errorCode = code;
         } else {
+            log.error("Authentication failed with unexpected exception: {}", exception.getMessage(), exception);
             errorCode = LoginErrorCode.AUTH_FAILED;
         }
         return errorCode;

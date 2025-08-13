@@ -8,6 +8,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
+import org.springframework.web.server.session.InMemoryWebSessionStore;
+import org.springframework.web.server.session.WebSessionStore;
 
 @Configuration
 public class SecurityModule {
@@ -25,5 +27,10 @@ public class SecurityModule {
     @Bean
     public ReactiveSessionRegistry sessionRegistry() {
         return new InMemoryReactiveSessionRegistry();
+    }
+
+    @Bean
+    public WebSessionStore webSessionStore() {
+        return new InMemoryWebSessionStore();
     }
 }

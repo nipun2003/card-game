@@ -1,9 +1,12 @@
 
 ###
-POST http://localhost:8080/auth/login
+POST http://localhost:8079/auth/login
 Content-Type: application/json
 
 {
-  "email" : "test@gmail.com",
+  "email" : "Test@gmail.com",
   "password" : "Test@123"
 }
+
+###
+GET http://localhost:8079/user/me

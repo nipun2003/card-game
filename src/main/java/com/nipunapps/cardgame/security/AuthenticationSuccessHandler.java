@@ -11,9 +11,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.session.ReactiveSessionRegistry;
 import org.springframework.security.web.server.WebFilterExchange;
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -24,40 +26,44 @@ public class AuthenticationSuccessHandler implements ServerAuthenticationSuccess
 
     private final ObjectMapper objectMapper;
     private final ReactiveSessionRegistry sessionRegistry;
+    private final ServerSecurityContextRepository securityContextRepository;
+
 
     @Override
     public Mono<Void> onAuthenticationSuccess(WebFilterExchange exchange, Authentication authentication) {
-        return sessionRegistry.getAllSessions(authentication.getPrincipal())
-                .collectList()
-                .doOnSuccess(sessions -> {
-                    log.info("User {} authenticated successfully with {} active sessions.",
-                            authentication.getName(), sessions.size());
-                })
-                .then(Mono.defer(() -> {
-                    ServerHttpResponse response = exchange.getExchange().getResponse();
-                    response.setStatusCode(HttpStatus.OK);
-                    response.getHeaders().add("Content-Type", "application/json");
-                    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        return securityContextRepository.save(exchange.getExchange(),
+                        new SecurityContextImpl(authentication))
+                .then(sessionRegistry.getAllSessions(authentication.getPrincipal())
+                        .collectList()
+                        .doOnSuccess(sessions -> {
+                            log.info("User {} authenticated successfully with {} active sessions.",
+                                    authentication.getName(), sessions.size());
+                        })
+                        .then(Mono.defer(() -> {
+                            ServerHttpResponse response = exchange.getExchange().getResponse();
+                            response.setStatusCode(HttpStatus.OK);
+                            response.getHeaders().add("Content-Type", "application/json");
+                            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-                    final var userData = LoginResponseDto.builder()
-                            .username(authentication.getName())
-                            .roles(authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList()
-                            ).build();
-                    final var responseData = BaseResponse.<LoginResponseDto>builder()
-                            .success(true)
-                            .data(userData)
-                            .build();
+                            final var userData = LoginResponseDto.builder()
+                                    .username(authentication.getName())
+                                    .roles(authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList()
+                                    ).build();
+                            final var responseData = BaseResponse.<LoginResponseDto>builder()
+                                    .success(true)
+                                    .data(userData)
+                                    .build();
 
-                    String errorResponse;
-                    try {
-                        errorResponse = objectMapper.writeValueAsString(responseData);
-                    } catch (Exception e) {
-                        errorResponse = "{\"success\":false,\"message\":\"Internal Server Error\",\"errorCode\":\"500\"}";
-                        response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-                    }
+                            String errorResponse;
+                            try {
+                                errorResponse = objectMapper.writeValueAsString(responseData);
+                            } catch (Exception e) {
+                                errorResponse = "{\"success\":false,\"message\":\"Internal Server Error\",\"errorCode\":\"500\"}";
+                                response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
+                            }
 
-                    DataBuffer buffer = response.bufferFactory().wrap(errorResponse.getBytes());
-                    return response.writeWith(Mono.just(buffer));
-                }));
+                            DataBuffer buffer = response.bufferFactory().wrap(errorResponse.getBytes());
+                            return response.writeWith(Mono.just(buffer));
+                        })));
     }
 }

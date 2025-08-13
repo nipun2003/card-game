@@ -9,11 +9,13 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.session.ReactiveSessionRegistry;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.security.web.server.authentication.*;
+import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.server.session.WebSessionStore;
 
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +31,8 @@ public class SecurityConfig {
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
     private final AuthenticationFailureHandler authenticationFailureHandler;
     private final ReactiveSessionRegistry sessionRegistry;
+    private final ServerSecurityContextRepository securityContextRepository;
+    private final WebSessionStore webSessionStore;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -37,7 +41,28 @@ public class SecurityConfig {
         loginFilter.setRequiresAuthenticationMatcher(
                 ServerWebExchangeMatchers.pathMatchers(HttpMethod.POST, "/auth/login")
         );
-        loginFilter.setAuthenticationSuccessHandler(authenticationSuccessHandler);
+
+        // 1. Register the session when authentication succeeds
+        RegisterSessionServerAuthenticationSuccessHandler registerHandler =
+                new RegisterSessionServerAuthenticationSuccessHandler(sessionRegistry);
+
+        // 2. Apply concurrency control
+        ConcurrentSessionControlServerAuthenticationSuccessHandler concurrentHandler =
+                new ConcurrentSessionControlServerAuthenticationSuccessHandler(
+                        sessionRegistry,
+                        new InvalidateLeastUsedServerMaximumSessionsExceededHandler(webSessionStore)
+                );
+        concurrentHandler.setSessionLimit(SessionLimit.of(3));
+
+        // 3. Combine concurrency + your custom response
+        DelegatingServerAuthenticationSuccessHandler successChain =
+                new DelegatingServerAuthenticationSuccessHandler(
+                        registerHandler,
+                        concurrentHandler,
+                        authenticationSuccessHandler // your JSON response logic
+                );
+
+        loginFilter.setAuthenticationSuccessHandler(successChain);
         loginFilter.setAuthenticationFailureHandler(authenticationFailureHandler);
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -49,6 +74,7 @@ public class SecurityConfig {
                     exchange.pathMatchers("/auth/**").permitAll();
                     exchange.anyExchange().authenticated();
                 })
+                .securityContextRepository(securityContextRepository)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .addFilterAt(loginFilter, SecurityWebFiltersOrder.AUTHENTICATION)
