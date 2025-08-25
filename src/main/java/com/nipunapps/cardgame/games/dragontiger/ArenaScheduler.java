@@ -1,15 +1,20 @@
 package com.nipunapps.cardgame.games.dragontiger;
 
 import com.nipunapps.cardgame.enums.GameLifecycle;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
+@RequiredArgsConstructor
 public class ArenaScheduler {
+
+    private final Scheduler scheduler;
 
     private final AtomicReference<Disposable> idleDestroyTask = new AtomicReference<>();
     private final AtomicReference<Disposable> gameStartTask = new AtomicReference<>();
@@ -17,7 +22,7 @@ public class ArenaScheduler {
     public void scheduleIdleDestroy(String roomId, DragonTigerArenaState state, Runnable onDestroy, int seconds) {
         cancelTask(idleDestroyTask);
 
-        Disposable disposable = Mono.delay(Duration.ofSeconds(seconds))
+        Disposable disposable = Mono.delay(Duration.ofSeconds(seconds),scheduler)
                 .filter(t -> state.getPlayers().isEmpty() && state.getLifecycle() == GameLifecycle.IDLE)
                 .doOnNext(t -> {
                     log.info("Room {} idle for {}s. Destroying...", roomId, seconds);
@@ -31,7 +36,7 @@ public class ArenaScheduler {
     public void scheduleGameStart(String roomId, DragonTigerArenaState state, Runnable onStart, int seconds, Runnable onReschedule) {
         cancelTask(gameStartTask);
 
-        Disposable disposable = Mono.delay(Duration.ofSeconds(seconds))
+        Disposable disposable = Mono.delay(Duration.ofSeconds(seconds),scheduler)
                 .doOnNext(t -> {
                     if (state.getPlayers().isEmpty()) {
                         log.info("Room {} empty after {}s, rescheduling idle destroy", roomId, seconds);

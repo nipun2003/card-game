@@ -12,10 +12,10 @@ import com.nipunapps.cardgame.games.dragontiger.model.DragonTigerPlayerBet;
 import com.nipunapps.cardgame.games.dragontiger.model.PlayerJoinedMessage;
 import com.nipunapps.cardgame.models.PlayerModel;
 import com.nipunapps.cardgame.sockets.WebSocketMessageSender;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 
 import java.util.Map;
 import java.util.Objects;
@@ -36,30 +36,37 @@ import java.util.Objects;
  * Thread safety is ensured using concurrent collections and atomic references.
  * </p>
  */
-@RequiredArgsConstructor
 @Slf4j
 public class InMemoryDragonTigerArena implements DragonTigerArena {
 
-    /**
-     * Maximum number of state.getPlayers() allowed in this room.
-     */
-    private static final int MAX_PLAYERS = 5;
 
-    private static final int MAX_IDLE_SECONDS = 90; // 1.5 minutes
-    private static final int GAME_START_DELAY_SECONDS = 5; // 15 seconds
     private static final int BETTING_DURATION_SECONDS = 20; // 20 seconds
     private static final int DEALING_DURATION_SECONDS = 5; // 5 seconds
     private static final int REVEALING_DURATION_SECONDS = 5; // 5 seconds
 
 
     private final DragonTigerArenaState state = new DragonTigerArenaState();
-    private final ArenaScheduler scheduler = new ArenaScheduler();
+    private ArenaScheduler scheduler;
 
     // Required parameters
     private final WebSocketMessageSender messageSender;
     private final String roomId;
 
+    public InMemoryDragonTigerArena(
+            WebSocketMessageSender messageSender,
+            String roomId,
+            ArenaScheduler scheduler
+    ) {
+        this.messageSender = messageSender;
+        this.roomId = roomId;
+        this.scheduler = scheduler;
+        scheduleDestroyIfIdle();
+    }
+
+
     private void scheduleDestroyIfIdle() {
+        log.info("Scheduling idle destroy for room {} in {} seconds if no players join.",
+                roomId, DragonTigerArena.MAX_IDLE_SECONDS);
         scheduler.scheduleIdleDestroy(
                 roomId,
                 state,
@@ -69,7 +76,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                     // Additional cleanup logic
                     destroyArena();
                 },
-                MAX_IDLE_SECONDS
+                DragonTigerArena.MAX_IDLE_SECONDS
         );
     }
 
@@ -90,7 +97,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                         log.info("Game in room {} started.", roomId);
                     }
                 },
-                GAME_START_DELAY_SECONDS,
+                DragonTigerArena.GAME_START_DELAY_SECONDS,
                 this::scheduleDestroyIfIdle
         );
     }
@@ -113,7 +120,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                     "Invalid or expired join token."));
         }
 
-        if (state.getPlayers().size() >= MAX_PLAYERS) {
+        if (state.getPlayers().size() >= DragonTigerArena.MAX_PLAYERS) {
             return Mono.error(new DragonTigerJoinException(
                     DragonTigerJoinFailureCause.ROOM_FULL,
                     "The game room is full."));
@@ -143,6 +150,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                         DragonTigerJoinFailureCause.PLAYER_ALREADY_IN_ROOM,
                         "Player is already in the game room."));
             }
+            initiateTheGame();
             DragonTigerJoinResult result = DragonTigerJoinResult.builder()
                     .success(true)
                     .lifecycle(state.getLifecycle())
@@ -178,16 +186,13 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                 .doOnSuccess(t -> {
                     state.getPlayerTokens().remove(player.getId());
                     log.info("Player {} joined room {}", player.getName(), roomId);
-                    initiateTheGame();
                 })
                 .onErrorResume(DragonTigerJoinException.class, ex -> {
                     log.info("Player {} failed to join room {}: {} (cause: {})",
                             player.getName(), roomId, ex.getMessage(), ex.getCauseType());
-                    if (state.getPlayers().isEmpty()) scheduleDestroyIfIdle();
                     return Mono.just(DragonTigerJoinResult.failure(ex.getCauseType(), ex.getMessage()));
                 }).onErrorResume(t -> {
-                    log.error("Player {} failed to join room {}: {}", player.getName(), roomId, t.getMessage());
-                    if (state.getPlayers().isEmpty()) scheduleDestroyIfIdle();
+                    log.error("Player {} failed to join room {}: {}", player.getName(), roomId, t.getMessage(),t);
                     return Mono.just(DragonTigerJoinResult.failure(DragonTigerJoinFailureCause.UNKNOWN_ERROR, t.getMessage()));
                 })
                 .doFirst(() -> log.info("Player with id {} attempts to join the room {}", player.getId(), roomId));
@@ -203,8 +208,8 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
     }
 
     @Override
-    public Mono<Boolean> destroyArena() {
-        return Mono.fromCallable(() -> {
+    public void destroyArena() {
+        Mono.fromCallable(() -> {
             state.setLifecycle(GameLifecycle.DESTROYED);
             state.setPhase(null);
             state.getPlayers().clear();
