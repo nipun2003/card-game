@@ -10,4 +10,6 @@ public interface DragonTigerArena {
     Mono<Boolean> addPlayerToken(String token, String playerId);
 
     Mono<DragonTigerJoinResult> join(String token, PlayerModel player);
+
+    Mono<Boolean> destroyArena();
 }

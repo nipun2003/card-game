@@ -51,6 +51,8 @@ public class DragonTigerJoinResult {
      */
     private List<PlayerDto> players;
 
+    private long startInSec;
+
     public static DragonTigerJoinResult failure(DragonTigerJoinFailureCause cause, String message) {
         return DragonTigerJoinResult.builder()
                 .success(false)
