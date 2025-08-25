@@ -20,13 +20,18 @@ public enum GameLifecycle {
     WAITING,
 
     /**
-     * Game is currently in progress (refer to {@link DragonTigerPhase}).
+     * Game is currently in progress (refer to {@link com.nipunapps.cardgame.games.dragontiger.enums.DragonTigerPhase}).
      */
     RUNNING,
 
     /**
      * Game has ended and the room is destroyed / archived.
      */
-    DESTROYED
+    DESTROYED;
+
+
+    public static boolean isAlreadyWaitingOrRunning(GameLifecycle lifecycle) {
+        return lifecycle == WAITING || lifecycle == RUNNING;
+    }
 }
 
