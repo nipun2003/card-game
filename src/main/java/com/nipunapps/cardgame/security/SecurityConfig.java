@@ -72,6 +72,7 @@ public class SecurityConfig {
                     exchange.pathMatchers("/").permitAll();
                     exchange.pathMatchers("/health").permitAll();
                     exchange.pathMatchers("/auth/**").permitAll();
+                    exchange.pathMatchers("/ws/**").permitAll();
                     exchange.anyExchange().authenticated();
                 })
                 .securityContextRepository(securityContextRepository)
