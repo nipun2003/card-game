@@ -3,7 +3,6 @@ package com.nipunapps.cardgame.repository.impl;
 import com.nipunapps.cardgame.models.PlayerModel;
 import com.nipunapps.cardgame.repository.RoomPlayerRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 
@@ -25,6 +24,18 @@ public class InMemoryRoomPlayerRepository implements RoomPlayerRepository {
                 List.copyOf(roomPlayers
                         .computeIfAbsent(roomId, id -> new ConcurrentHashMap<>())
                         .values())
+        );
+    }
+
+    @Override
+    public Mono<List<PlayerModel>> findAllPlayersSeatedPlayerByRoomId(String roomId) {
+        return Mono.fromSupplier(() ->
+                roomPlayers
+                        .computeIfAbsent(roomId, id -> new ConcurrentHashMap<>())
+                        .values()
+                        .stream()
+                        .filter(PlayerModel::isSeated)
+                        .toList()
         );
     }
 

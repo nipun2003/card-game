@@ -9,6 +9,8 @@ public interface RoomPlayerRepository {
 
     Mono<List<PlayerModel>> findAllPlayersByRoomId(String roomId);
 
+    Mono<List<PlayerModel>> findAllPlayersSeatedPlayerByRoomId(String roomId);
+
     Mono<PlayerModel> findPlayerByIdAndRoomId(String playerId, String roomId);
 
     Mono<Void> savePlayerToRoom(PlayerModel player, String roomId);

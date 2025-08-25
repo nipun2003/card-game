@@ -29,6 +29,9 @@ public class PlayerModel {
     @Builder.Default
     private Instant lastBreath = Instant.now();
 
+    @Builder.Default
+    private boolean isSeated = false;
+
     public PlayerDto toDto() {
         return PlayerDto.builder()
                 .id(id)

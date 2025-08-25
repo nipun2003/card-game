@@ -32,6 +32,19 @@ public class RoomEventSender {
                 });
     }
 
+    public Mono<Void> broadcastMessageToSeated(String roomId, Object message) {
+        return repository.findAllPlayersSeatedPlayerByRoomId(roomId)
+                .flatMap(players -> {
+                    if (players.isEmpty()) {
+                        return Mono.error(new RoomEventException(
+                                "No players found in room " + roomId));
+                    }
+                    return Flux.fromIterable(players)
+                            .flatMap(player -> sendMessageToPlayerSafe(player, message))
+                            .then();
+                });
+    }
+
     /**
      * Sends a message to a specific player.
      * Throws {@link RoomEventException} if the player is not found or session is null.
