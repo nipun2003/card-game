@@ -1,7 +1,10 @@
 package com.nipunapps.cardgame.games.dragontiger;
 
+import com.nipunapps.cardgame.entity.UserEntity;
 import com.nipunapps.cardgame.exception.UserNotFoundException;
 import com.nipunapps.cardgame.games.exception.NoTokenFoundException;
+import com.nipunapps.cardgame.games.exception.NotEnoughPocketAmountException;
+import com.nipunapps.cardgame.games.exception.PlayerNotFoundException;
 import com.nipunapps.cardgame.games.exception.RoomFullException;
 import com.nipunapps.cardgame.models.PlayerModel;
 import com.nipunapps.cardgame.repository.RoomPlayerRepository;
@@ -39,6 +42,28 @@ public class DragonTigerPlayerManagement {
                 .switchIfEmpty(Mono.error(new UserNotFoundException("User not found for tokenId: " + tokenId)))
                 .flatMap(user -> {
                     final var player = PlayerModel.fromUserEntity(user, session);
+                    return playerRepository.savePlayerToRoom(player, roomId)
+                            .thenReturn(player);
+                });
+    }
+
+    public Mono<PlayerModel> seatPlayer(String roomId, String playerId, long pocketAmount) {
+        Mono<PlayerModel> playerMono = playerRepository
+                .findPlayerByIdAndRoomId(playerId, roomId)
+                .switchIfEmpty(Mono.error(new PlayerNotFoundException(playerId, roomId)));
+        Mono<Long> coinMono = userRepository.findById(playerId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException(playerId)))
+                .map(UserEntity::getCoins);
+
+        return Mono.zip(playerMono, coinMono)
+                .flatMap(tuple -> {
+                    PlayerModel player = tuple.getT1();
+                    long coin = tuple.getT2();
+                    if (coin < pocketAmount) {
+                        return Mono.error(new NotEnoughPocketAmountException(playerId, pocketAmount, coin));
+                    }
+                    player.setSeated(true);
+                    player.setPocketCoin(pocketAmount);
                     return playerRepository.savePlayerToRoom(player, roomId)
                             .thenReturn(player);
                 });
