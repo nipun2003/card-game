@@ -17,5 +17,5 @@ public class PlayerDto {
     private String profileUri = "";
 
     @Builder.Default
-    private int pocketCoin = 50_000;
+    private long pocketCoin = 50_000;
 }

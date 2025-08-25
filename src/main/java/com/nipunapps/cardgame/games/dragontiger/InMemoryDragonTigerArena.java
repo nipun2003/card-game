@@ -15,7 +15,6 @@ import com.nipunapps.cardgame.sockets.WebSocketMessageSender;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 
 import java.util.Map;
 import java.util.Objects;
@@ -46,7 +45,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
 
 
     private final DragonTigerArenaState state = new DragonTigerArenaState();
-    private ArenaScheduler scheduler;
+    private final ArenaScheduler scheduler;
 
     // Required parameters
     private final WebSocketMessageSender messageSender;
@@ -192,7 +191,7 @@ public class InMemoryDragonTigerArena implements DragonTigerArena {
                             player.getName(), roomId, ex.getMessage(), ex.getCauseType());
                     return Mono.just(DragonTigerJoinResult.failure(ex.getCauseType(), ex.getMessage()));
                 }).onErrorResume(t -> {
-                    log.error("Player {} failed to join room {}: {}", player.getName(), roomId, t.getMessage(),t);
+                    log.error("Player {} failed to join room {}: {}", player.getName(), roomId, t.getMessage(), t);
                     return Mono.just(DragonTigerJoinResult.failure(DragonTigerJoinFailureCause.UNKNOWN_ERROR, t.getMessage()));
                 })
                 .doFirst(() -> log.info("Player with id {} attempts to join the room {}", player.getId(), roomId));
